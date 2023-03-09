@@ -1,0 +1,208 @@
+---
+title: "Cyclistic Bike-share Study Case"
+author: "Lydia"
+date: "2022-11-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# How does a bicycle sharing business achieve success?
+## What is Cyclistic Bike-Share?
+
+In 2016, Cyclistic launched a successful bike sharing offering. Since then, the program has grown to a fleet of 5,824 bikes that are geo-tracked and locked into a network of 692 stations throughout Chicago. Bikes can be accessed from one station and returned to another at any time in the system.
+Cyclistic differentiates itself from other companies by also offering reclining bikes, hand tricycles, and cargo bikes, making bike-share more inclusive for people with disabilities and riders who cannot use standard two-wheeled bicycles.
+
+## Stakeholders
+1. Cyclistic users
+2. Director of Marketing
+3. Cyclistic Marketing Team
+4. Cyclistic Executive Team
+
+## Business Goals
+### Design a marketing strategy aimed at converting regular riders into annual members.
+
+## Table of Interest
+### 1. Annual Members vs Casual Members
+### 2. Cyclistic Annual Membership
+### 3. Cyclistic Digital Media
+
+## Data Cleaning
+### Preparing Data
+### Install Packages and Load Library
+
+```{r install packages and load library}
+install.packages("janitor")
+install.packages("lubridate")
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(janitor)
+library(lubridate)
+```
+
+### Load Dataset
+We need to load all the dataset(The dataset is from January 2022-October 2022 --> the lastest dataset)
+
+```{r Load dataset}
+trip22_Jan <- read.csv("202201-divvy-tripdata.csv")
+trip22_Feb <- read.csv("202202-divvy-tripdata.csv")
+trip22_Mar <- read.csv("202203-divvy-tripdata.csv")
+trip22_Apr <- read.csv("202204-divvy-tripdata.csv")
+trip22_May <- read.csv("202205-divvy-tripdata.csv")
+trip22_Jun <- read.csv("202206-divvy-tripdata.csv")
+trip22_Jul <- read.csv("202207-divvy-tripdata.csv")
+trip22_Aug <- read.csv("202208-divvy-tripdata.csv")
+trip22_Sep <- read.csv("202209-divvy-publictripdata.csv")
+trip22_Oct <- read.csv("202210-divvy-tripdata.csv")
+```
+
+### Combine all the Dataset to consolidate Analysis
+Combine all that dataset and make new variable for the next futher analyze.
+
+```{r Combine the dataset}
+trip22_fill <- rbind(trip22_Jan, trip22_Feb, trip22_Mar, trip22_Apr, trip22_May, trip22_Jun, trip22_Jul, trip22_Aug, trip22_Sep, trip22_Oct)
+```
+### Check the dataset
+
+```{r Check the dataset}
+View(trip22_fill)
+```
+
+### Pick some dataset that we want to explore
+
+```{r select the dataset}
+trip22_fill2 <- trip22_fill %>% 
+  select(ride_id, rideable_type, started_at, ended_at, start_station_name, end_station_name, member_casual)
+```
+
+### Review of the data and it's parameters
+
+```{r review the dataset}
+head(trip22_fill2, 10)
+colnames(trip22_fill2)
+nrow(trip22_fill2)
+dim(trip22_fill2)
+str(trip22_fill2)
+summary(trip22_fill2)
+```
+
+### For started_at and ended_at must be created for Date and Time
+
+```{r Convert the data type}
+trip22_fill2$date <- as.Date(trip22_fill2$started_at)
+trip22_fill2$month <- format(as.Date(trip22_fill2$date), "%m")
+trip22_fill2$day <- format(as.Date(trip22_fill2$date), "%d")
+trip22_fill2$year <- format(as.Date(trip22_fill2$date), "%Y")
+trip22_fill2$day_of_week <- format(as.Date(trip22_fill2$date), "%A")
+trip22_fill2$time <- format(trip22_fill2$started_at, format= "%H:%M")
+trip22_fill2$time <- as.POSIXct(trip22_fill2$time, format= "%H:%M")
+```
+
+### create calculated field to isolate time spent on every ride.
+
+```{r Created calculated field}
+trip22_fill2$ride_length <- (as.double(difftime(trip22_fill2$ended_at, trip22_fill2$started_at))) /60
+```
+
+### Check data structure
+
+```{r Check data structure}
+str(trip22_fill2)
+```
+
+### Change data type for Ride Length
+
+```{r Check data type--> ride length}
+trip22_fill2$ride_length <- as.numeric(as.character(trip22_fill2$ride_length))
+```
+
+### Remove all blank entries for data set
+
+```{r remove all blank entries}
+trip22_fill3 <- trip22_fill2[!(trip22_fill2$start_station_name == "HQ QR" | trip22_fill2$ride_length<0),]
+```
+
+### Observe the new created column for the backup dataset
+
+```{r observe}
+summary(trip22_fill3$ride_length)
+```
+
+## Analyze Data
+### Calculating the mean, median, max, min - figures to determine statistical speed of membership type
+
+```{r calculating}
+aggregate(trip22_fill3$ride_length ~ trip22_fill3$member_casual, FUN = mean)
+aggregate(trip22_fill3$ride_length ~ trip22_fill3$member_casual, FUN = median)
+aggregate(trip22_fill3$ride_length ~ trip22_fill3$member_casual, FUN = max)
+aggregate(trip22_fill3$ride_length ~ trip22_fill3$member_casual, FUN = min)
+```
+
+### Order's days of week within new dataset for futher use
+
+```{r orders days of week}
+trip22_fill3$day_of_week <- ordered(trip22_fill3$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+
+### Create a Week Day
+
+```{r create a week day}
+trip22_fill3 %>% 
+  mutate(day_of_week = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, day_of_week) %>% 
+  summarise(num_of_rides = n())
+
+View(trip22_fill3)
+```
+
+## DATA VISUALIZATION
+
+```{r data visualization 1}
+trip22_fill3$day_of_week  <- format(as.Date(trip22_fill3$date), "%A")
+trip22_fill3 %>%                              #total rides broken down by weekday
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual, day_of_week) %>%
+  ggplot(aes(x = day_of_week, y = number_of_rides, fill = member_casual)) + geom_col(position = "dodge") + 
+  labs(x='Day of Week', y='Total Number of Rides', title='Rides per Day of Week', fill = 'Type of Membership') + 
+  scale_y_continuous(breaks = c(250000, 400000, 550000), labels = c("250K", "400K", "550K"))
+```
+The rides per week show that the casual riders is peak on Saturday and Sunday, but the member riders is peak on Tuesday, Wednesday and Thursday
+
+```{r data visualization 2}
+trip22_fill3 %>%   #total rides broken down by month
+  group_by(member_casual, month) %>%  
+  summarise(total_rides = n(),`average_duration_(mins)` = mean(ride_length)) %>% 
+  arrange(member_casual) %>% 
+  ggplot(aes(x=month, y=total_rides, fill = member_casual)) + geom_col(position = "dodge") + 
+  labs(x= "Month", y= "Total Number of Rides", title = "Rides per Month", fill = "Type of Membership") + 
+  scale_y_continuous(breaks = c(100000, 200000, 300000, 400000), labels = c("100K", "200K", "300K", "400K")) + theme(axis.text.x = element_text(angle = 0))
+```
+The rides per month show that casual riders were a lot more active during the summer months than the long-term. 
+Conversly, the winter months show very little activity on the part of the casual users. 
+The long-term users are more active in the winter and spring months
+
+```{r data visualization 3}
+trip22_fill3 %>%    #looking at breakdown of bike types rented
+  ggplot(aes(x = rideable_type, fill = member_casual)) + geom_bar(position = "dodge") + 
+  labs(x= 'Type of Bike', y='Number of Rentals', title='Type of Bike Works The Most', fill = 'Type of Membership') +
+  scale_y_continuous(breaks = c(500000, 1000000, 1500000), labels = c("500K", "1Mil", "1.5Mil"))
+```
+The breakdown of which type of bike is the most popular among either type of user. 
+Showing among the two types of bikes classic and electric. 
+Both types of memberships prefer using the classic bike more so than the electric bike. 
+The long-term memebrs are also seen to be of the two types favours the classic bike.
+
+```{r data visualization 4}
+trip22_fill3 %>%        #Find the average time spent riding by each membership type per individul day
+  mutate(day_of_week = wday(started_at, label = TRUE)) %>%  
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, day_of_week)  %>% 
+  ggplot(aes(x = day_of_week, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") + labs(x='Days of the week', y='Average duration - Hrs', title='Average Ride Time per Week', fill='Type of Membership')
+```
